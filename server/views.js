@@ -31,7 +31,49 @@ exports.getBooks = async () => {
     const rows = db.all(sql, [], (err, rows) => {
       if (err) {
         resolve({ response: null, error: err });
+      } else {
+        resolve({ response: rows, error: null });
       }
+    });
+  });
+  return sqlResult;
+};
+
+exports.getBook = async (bookId) => {
+  const sql = `SELECT * FROM Books WHERE Book_ID = ${bookId};`;
+  console.log("sql: ", sql);
+  const db = await dbPromise;
+  const sqlResult = new Promise((resolve, reject) => {
+    const rows = db.all(sql, [], (err, rows) => {
+      if (err) {
+        resolve({ response: null, error: err });
+        return;
+      }
+      console.log(rows, rows.length);
+      if (rows.length === 0) {
+        resolve({ response: null, error: "Book Not Found" });
+      } else {
+        resolve({ response: rows[0], error: null });
+      }
+    });
+  });
+  return sqlResult;
+};
+
+exports.getBooksWithPagination = async (offset, limit) => {
+  console.log(offset, limit);
+  const sql = `SELECT * FROM Books LIMIT ${
+    parseInt(offset) + parseInt(limit)
+  } OFFSET ${offset};`;
+  console.log("sql: ", sql);
+  const db = await dbPromise;
+  const sqlResult = new Promise((resolve, reject) => {
+    const rows = db.all(sql, [], (err, rows) => {
+      if (err) {
+        resolve({ response: null, error: err });
+        return;
+      }
+      console.log(rows, rows.length);
       resolve({ response: rows, error: null });
     });
   });

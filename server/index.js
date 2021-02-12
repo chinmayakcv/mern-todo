@@ -1,7 +1,12 @@
 const express = require("express");
 const path = require("path");
 const { createDb } = require("./db_init");
-const { createBooks, getBooks } = require("./views");
+const {
+  createBooks,
+  getBooks,
+  getBook,
+  getBooksWithPagination,
+} = require("./views");
 
 const db_name = path.join(__dirname, "data", "apptest.db");
 console.log({ db_name });
@@ -34,6 +39,34 @@ app.get("/get/books", async (req, res) => {
     if (error) {
       res.status(417).send("Something Went Wrong");
     } else {
+      res.status(200).send(response);
+    }
+  } catch (e) {}
+});
+
+app.get("/get/:bookId/books", async (req, res) => {
+  try {
+    const { response, error } = await getBook(req.params.bookId);
+    if (error) {
+      res.status(404).send("Book Id notfound");
+    } else {
+      console.log("Response: ", response);
+      res.status(200).send(response);
+    }
+  } catch (e) {}
+});
+
+app.get("/get/books_with_pagination/", async (req, res) => {
+  try {
+    console.log(req.query);
+    const offset = req.query.offset || 0;
+    const limit = req.query.limit || 10;
+    console.log(offset, limit);
+    const { response, error } = await getBooksWithPagination(offset, limit);
+    if (error) {
+      res.status(404).send("Book Id notfound");
+    } else {
+      console.log("Response: ", response);
       res.status(200).send(response);
     }
   } catch (e) {}
