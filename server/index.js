@@ -1,6 +1,8 @@
 const express = require("express");
 const path = require("path");
 const { createDb } = require("./db_init");
+const { createBooks, getBooks } = require("./views");
+
 const db_name = path.join(__dirname, "data", "apptest.db");
 console.log({ db_name });
 const dbPromise = createDb(db_name);
@@ -16,27 +18,23 @@ app.get("/", (req, res) => {
 });
 
 app.get("/books/v1", async (req, res) => {
-  const sql_insert = `INSERT INTO Books (Book_ID, Title, Author, Comments) VALUES
-    (1, 'Mrs. Bridge', 'Evan S. Connell', 'First in the serie'),
-    (2, 'Mr. Bridge', 'Evan S. Connell', 'Second in the serie'),
-    (3, 'L''ingénue libertine', 'Colette', 'Minne + Les égarements de Minne');`;
-  const db = await dbPromise;
-  db.run(sql_insert, (err) => {
-    if (err) {
-      return console.error(err.message);
+  try {
+    const { response, error } = await createBooks();
+    if (error) {
+      res.status(417).send("Something Went Wrong");
+    } else {
+      res.status(201).send(response);
     }
-    console.log("Successful creation of 3 books");
-    res.send("Successfully inserted");
-  });
+  } catch (e) {}
 });
 
 app.get("/get/books", async (req, res) => {
-  const sql = "SELECT * FROM Books ORDER BY Title";
-  const db = await dbPromise;
-  db.all(sql, [], (err, rows) => {
-    if (err) {
-      return console.error(err.message);
+  try {
+    const { response, error } = await getBooks();
+    if (error) {
+      res.status(417).send("Something Went Wrong");
+    } else {
+      res.status(200).send(response);
     }
-    res.send(rows);
-  });
+  } catch (e) {}
 });
