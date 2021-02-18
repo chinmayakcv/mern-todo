@@ -7,6 +7,8 @@ const dbPromise = createDb(db_name);
 
 const app = express();
 
+app.use(express.json())
+
 app.listen(8000, () => {
   console.log("Server started (http://localhost:8000/) !");
 });
@@ -29,6 +31,10 @@ app.get("/books/v1", async (req, res) => {
     res.send("Successfully inserted");
   });
 });
+
+app.get('/books/:id',(req, res)=> {
+  req.send(req.params.id)
+})
 
 app.get("/get/books", async (req, res) => {
   const sql = "SELECT * FROM Books ORDER BY Title";
