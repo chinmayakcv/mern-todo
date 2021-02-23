@@ -1,0 +1,10 @@
+POST http://localhost:8001/post/books/
+content-type: application/json
+
+{
+    "hello":"test"
+}
+
+###
+
+http://localhost:8001/get/books/
