@@ -3,23 +3,12 @@ const express = require("express");
 const path = require("path");
 const { open } = require("sqlite");
 const sqlite3 = require("sqlite3");
-const passport = require("passport");
-const sqliteStoreFactory = require("express-session-sqlite").default;
-const LocalStrategy = require("passport-local").Strategy;
-var crypto = require("crypto");
+var bcrypt = require("bcrypt");
 const bodyParser = require("body-parser");
 const cors = require("cors");
-const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
 
 const dbPath = path.join(__dirname, "data", "apptest.db");
-
-function hashPassword(password, salt) {
-  var hash = crypto.createHash("sha256");
-  hash.update(password);
-  hash.update(salt);
-  return hash.digest("hex");
-}
 // const SqliteStore = sqliteStoreFactory(session);
 
 const app = express();
@@ -33,22 +22,7 @@ app.use(
     credentials: true,
   })
 );
-/*
-  app.use(
-  session({
-    store: new SqliteStore({
-      driver: sqlite3.Database,
-      path: dbPath,
-      ttl: 1234,
-      prefix: "sess:",
-    }),
-    secret: "learn",
-    resave: true,
-    saveUninitialized: false,
-  })
-);
-*/
-app.use(cookieParser("learn"));
+
 /**
   Initialize db before initializing express server
 */
@@ -59,14 +33,13 @@ open({
   filename: dbPath,
   driver: sqlite3.Database,
 })
-  .then((sqliteDB) => {
+  .then(async (sqliteDB) => {
     db = sqliteDB;
     /** Create DB Tables */
     const create_users = `CREATE TABLE IF NOT EXISTS Users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT,
-    password TEXT, 
-    salt TEXT 
+    password TEXT 
 );`;
     const create_books = `CREATE TABLE IF NOT EXISTS Books (
         Book_ID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,43 +48,8 @@ open({
         Comments TEXT
       );`;
 
-    passport.use(
-      new LocalStrategy(function (username, password, done) {
-        db.get(
-          "SELECT salt FROM users WHERE username = ?",
-          username,
-          function (err, row) {
-            if (!row) return done(null, false);
-            var hash = hashPassword(password, row.salt);
-            db.get(
-              "SELECT username, id FROM users WHERE username = ? AND password = ?",
-              username,
-              hash,
-              function (err, row) {
-                if (!row) return done(null, false);
-                return done(null, row);
-              }
-            );
-          }
-        );
-      })
-    );
-
-    passport.serializeUser(function (user, done) {
-      return done(null, user.id);
-    });
-
-    passport.deserializeUser(function (id, done) {
-      db.get(
-        "SELECT id, username FROM users WHERE id = ?",
-        id,
-        function (err, row) {
-          if (!row) return done(null, false);
-          return done(null, row);
-        }
-      );
-    });
-
+    const usersTable = await db.run(create_users);
+    const booksTable = await db.run(create_books);
     app.listen(8001, () => {
       console.log("Server started (http://localhost:8000/) !");
     });
@@ -121,40 +59,73 @@ open({
     process.exit(-1);
   });
 
-app.use(passport.initialize());
 
 function authenticateToken(req, res, next) {
   const authHeader = req.headers["authorization"];
   const accessToken = authHeader && authHeader.split(" ")[1];
   if (!accessToken) res.sendStatus(401);
   else {
-    jwt.verify(accessToken,process.env.ACCESS_TOKEN_SECRET,(err, user) => {
-      if(err){
-        res.sendStatus(403)
+    jwt.verify(accessToken, process.env.ACCESS_TOKEN_SECRET, (err, user) => {
+      if (err) {
+        res.sendStatus(403);
       }
-      req.user = user
-      next()
-    })
+      req.user = user;
+      next();
+    });
   }
 }
 
 app.post("/register", async (req, res) => {
-  const result = await db.get(
-    "SELECT username, id FROM users WHERE username = :username AND password = :password",
+  const hashedPassword = await bcrypt.hash(req.body.password, 10);
+
+  const dbUser = await db.get(
+    "SELECT username, id FROM Users WHERE username = :username",
     {
       ":username": req.body.username,
-      ":password": req.body.password,
     }
   );
+  if (dbUser) {
+    res.status(400).send("Username already exists");
+    return;
+  }
+  const createUserSql = `INSERT INTO Users (username, password) VALUES (:username, :password)`;
+  const newUser = await db.run(createUserSql, {
+    ":username": req.body.username,
+    ":password": hashedPassword,
+  });
+  res.send(`Created new user ${newUser}`);
 });
 
-app.post("/login", (req, res) => {
-  // TODO: Authenticate User
+app.get("/users", authenticateToken, async (req, res) => {
+  const usersQuery = `SELECT * from Users`;
+  const users = await db.all(usersQuery);
+  res.send(users);
+});
 
+app.post("/login", async (req, res) => {
   const username = req.body.username;
-  const user = { name: username };
 
-  const accessToken = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET);
+  const dbUser = await db.get(
+    "SELECT id, username, password FROM Users WHERE username = :username",
+    { ":username": username }
+  );
+  console.log("db User ", dbUser, username );
+  if (!dbUser) {
+    res.status(400).send("Invalid Credentials");
+    return;
+  }
+  const isPasswordMactched = await bcrypt.compare(
+    req.body.password,
+    dbUser.password
+  );
+  if (isPasswordMactched === true) {
+    const user = { name: username, userId: dbUser.id };
+
+    const accessToken = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET);
+    res.send({ accessToken });
+  } else {
+    res.status(400).send("Invalid Password");
+  }
 });
 
 app.get("/", authenticateToken, (req, res) => {

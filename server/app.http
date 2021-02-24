@@ -7,4 +7,25 @@ content-type: application/json
 
 ###
 
-http://localhost:8001/
+POST http://localhost:8001/register
+Content-Type: application/json
+
+{
+    "username": "Chinmaya",
+    "password": "password"
+}
+
+###
+
+GET http://localhost:8001/users
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiQ2hpbm1heWExIiwidXNlcklkIjoyLCJpYXQiOjE2MTQxNDY2ODZ9.6H0pDUeNDHbO8SZR5HlIyoyIvcOG9Sld8ddTwEhPVGA
+
+###
+
+POST http://localhost:8001/login
+Content-Type: application/json
+
+{
+    "username": "Chinmaya1",
+    "password": "password1"
+}
