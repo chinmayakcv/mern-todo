@@ -1,8 +1,8 @@
+require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const { open } = require("sqlite");
 const sqlite3 = require("sqlite3");
-const session = require("express-session");
 const passport = require("passport");
 const sqliteStoreFactory = require("express-session-sqlite").default;
 const LocalStrategy = require("passport-local").Strategy;
@@ -10,6 +10,7 @@ var crypto = require("crypto");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
+const jwt = require("jsonwebtoken");
 
 const dbPath = path.join(__dirname, "data", "apptest.db");
 
@@ -19,7 +20,7 @@ function hashPassword(password, salt) {
   hash.update(salt);
   return hash.digest("hex");
 }
-const SqliteStore = sqliteStoreFactory(session);
+// const SqliteStore = sqliteStoreFactory(session);
 
 const app = express();
 
@@ -32,7 +33,8 @@ app.use(
     credentials: true,
   })
 );
-app.use(
+/*
+  app.use(
   session({
     store: new SqliteStore({
       driver: sqlite3.Database,
@@ -45,7 +47,7 @@ app.use(
     saveUninitialized: false,
   })
 );
-
+*/
 app.use(cookieParser("learn"));
 /**
   Initialize db before initializing express server
@@ -119,18 +121,43 @@ open({
     process.exit(-1);
   });
 
-app.use(passport.initialize())
-app.use(passport.session())
+app.use(passport.initialize());
 
-app.post("/register",(req,res) => {
-  const result = await db.get('SELECT username, id FROM users WHERE username = :username AND password = :password', {
-  ':username': req.body.username,
-  ':password': req.body.password
-})
-})
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers["authorization"];
+  const accessToken = authHeader && authHeader.split(" ")[1];
+  if (!accessToken) res.sendStatus(401);
+  else {
+    jwt.verify(accessToken,process.env.ACCESS_TOKEN_SECRET,(err, user) => {
+      if(err){
+        res.sendStatus(403)
+      }
+      req.user = user
+      next()
+    })
+  }
+}
 
+app.post("/register", async (req, res) => {
+  const result = await db.get(
+    "SELECT username, id FROM users WHERE username = :username AND password = :password",
+    {
+      ":username": req.body.username,
+      ":password": req.body.password,
+    }
+  );
+});
 
-app.get("/", (req, res) => {
+app.post("/login", (req, res) => {
+  // TODO: Authenticate User
+
+  const username = req.body.username;
+  const user = { name: username };
+
+  const accessToken = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET);
+});
+
+app.get("/", authenticateToken, (req, res) => {
   res.send("Hello world...");
 });
 
